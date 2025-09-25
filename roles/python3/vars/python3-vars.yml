@@ -1,0 +1,5 @@
+python3_pyenv_dir: "$HOME/.pyenv"
+python3_pyenv_git_repository: https://github.com/pyenv/pyenv.git
+
+python3_version: "3.6"  # The last one to build on RedHat 6 🤷‍♂️ - See https://stackoverflow.com/questions/53543477/building-python-3-7-1-ssl-module-failed
+python3_shell_init_file: "$HOME/.bash_profile"

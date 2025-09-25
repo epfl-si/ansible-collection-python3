@@ -1,0 +1,74 @@
+- tags: always
+  include_vars: python3-vars.yml
+
+# A word of warning: as a rule, Python enthusiasts (meaning, mostly,
+# the Ansible core team; but see more below) seem proudly ignorant of
+# a lot of “old” stuff. This obviously includes parsing — hence, their
+# whole indent-as-syntax affair, and also, picking YAML as a
+# “programming language”; More to the point here, they are also
+# ignorant of UNIX. As a consequence, `stderr` doesn't really work (or
+# in fact, at all) in `ansible.builtin.raw`; please use `stdout`
+# instead.
+
+- name: Uninstall (pyenv-built) python3
+  tags: python3.uninstall
+  when: >-
+    "python3.uninstall" in ansible_run_tags
+  ansible.builtin.raw: |
+    set -e -x
+    case "{{ python3_pyenv_dir }}" in
+      *pyenv*)  # Molly-guard
+        rm -rf "{{ python3_pyenv_dir }}" ;;
+    esac
+    {% if python3_shell_init_file is defined %}
+    if [ -f "{{ python3_shell_init_file }}" ]; then
+      sed -i.bak '/PYENV/d;/pyenv/d' "{{ python3_shell_init_file }}"
+    fi
+    {% endif %}
+
+- name: Clone pyenv
+  register: _python3_pyenv_git_clone
+  changed_when: >-
+    "ALREADY_DONE" not in _python3_pyenv_git_clone.stdout_lines
+  ansible.builtin.raw: |
+    set -e -x
+    if [ -d "{{ python3_pyenv_dir }}" ]; then
+      echo "ALREADY_DONE"
+      exit 0
+    fi
+    git clone  --depth 1 "{{ python3_pyenv_git_repository }}" "{{ python3_pyenv_dir }}"
+
+- name: pyenv install
+  register: _python3_pyenv_build
+  changed_when: _python3_pyenv_build.stdout_lines | length > 0
+  ansible.builtin.raw: >-
+    "{{ python3_pyenv_dir }}/bin/pyenv" install -s "{{ python3_version }}"
+
+- name: pyenv global
+  register: _python3_pyenv_global
+  changed_when: >-
+    "ALREADY_DONE" not in _python3_pyenv_global.stdout_lines
+  ansible.builtin.raw: |
+    set -e -x
+    if [ "$("{{ python3_pyenv_dir }}/bin/pyenv" global)" = "{{ python3_version }}" ] ; then
+      echo "ALREADY_DONE"
+      exit 0
+    fi
+    "{{ python3_pyenv_dir }}/bin/pyenv" global "{{ python3_version }}"
+
+- name: pyenv init (in `{{ python3_shell_init_file }}`)
+  register: _python3_pyenv_init
+  changed_when: >-
+    "ALREADY_DONE" not in _python3_pyenv_init.stdout_lines
+  ansible.builtin.raw: |
+    set -e -x
+    if grep PYENV_ROOT "{{ python3_shell_init_file }}"; then
+      echo "ALREADY_DONE"
+      exit 0
+    fi
+    {% if python3_shell_init_file is defined %}
+    "{{ python3_pyenv_dir }}/bin/pyenv" init \
+        2>&1 {# More stdout/stderr nonsense #} | \
+      grep -v '^#' >> "{{ python3_shell_init_file }}"
+    chmod +x "{{ python3_shell_init_file }}"
+    {% endif %}
