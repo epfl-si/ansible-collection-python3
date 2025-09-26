@@ -14,7 +14,7 @@ license:
 
 tags:
   - pyenv
-  - no-root
+  - noroot
 
 dependencies: {}
 
